@@ -1,21 +1,18 @@
-from fastapi import FastAPI,Request
-from bson import ObjectId
+from fastapi import FastAPI, Request
 import motor.motor_asyncio
 import pydantic
+from bson import ObjectId
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, HTTPException
+import  datetime 
+import pytz
 
-from datetime import datetime
-
-
+import requests
 
 app = FastAPI()
 
 origins = [
-    "http://localhost.80000",
-    "https://ecse3038-lab3-tester.netlify.app"
+    "http://localhost.80000"
 ]
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -25,74 +22,47 @@ app.add_middleware(
 )
 
 client = motor.motor_asyncio.AsyncIOMotorClient("mongodb+srv://ecsebot:Re0E5l79cJUNrf2u@cluster0.2yokb04.mongodb.net/?retryWrites=true&w=majority")
-db = client.water_tank
+db = client.smart_devices
+
+
 
 pydantic.json.ENCODERS_BY_TYPE[ObjectId]=str
 
 
-@app.get("/profile")
-async def get_profile():
-    profile = await db["profile"].find().to_list(999)
-    if len(profile) < 1:
-        return {}
-    return profile[0]
+@app.get("/api/state")
+async def get_state():
+  state = await db["data"].find_one({"poke": "mon"})
+
+  if state == None:
+    return {"fan": False, "light": False}
+  return state
 
 
 
-@app.post("/profile",status_code=201)
-async def create_new_profile(request:Request):
-    
-    profile_object = await request.json()
-    profile_object["last_updated"]=datetime.now()
+@app.put("/api/state")
+async def capture(request: Request): 
+  
+  update = await request.json()
 
-    new_profile = await db["profile"].insert_one(profile_object)
-    created_profile = await db["profile"].find_one({"_id": new_profile.inserted_id})
+  sunset = requests.get('https://ecse-sunset-api.onrender.com/api/sunset').json()
 
-    return created_profile
-
-
-
-
-@app.post("/data",status_code=201)
-async def create_new_profile(request:Request):
-    tank_object = await request.json()
-
-    new_tank = await db["tank"].insert_one(tank_object)
-    created_tank = await db["tank"].find_one({"_id": new_tank.inserted_id})
-
-    return created_tank
-
-    
-@app.get("/data")
-async def retrive_tanks():
-    tanks = await db["tank"].find().to_list(999)
-    return tanks
+  s_time = datetime.datetime.strptime(sunset['sunset'], '%Y-%m-%dT%H:%M:%S.%f').time()
+  current_time = datetime.datetime.now(pytz.timezone('Jamaica')).time()
+  datetime1 = datetime.datetime.strptime(str(s_time),"%H:%M:%S")
+  datetime2 = datetime.datetime.strptime(str(current_time),"%H:%M:%S.%f")
 
 
-@app.delete("/data/{id}",status_code=204)
-async def delete_tank(id: str):
+  
+  update["light"] = (datetime1<datetime2)
+  update["fan"] = (float(update["temperature"]) >= 28.0) 
 
-    found= await db["tank"].find_one({"_id": ObjectId(id)})
-    if (found) is None:
-        raise HTTPException(status_code=404, detail="Item not found")
-
-    remove_tank= await db["tank"].delete_one({"_id":ObjectId(id)})
-
-
-    
-    
-
-@app.patch("/data/{id}")
-async def do_update(id: str, request: Request):
-    updated= await request.json()
-   
-    result = await db["tank"].update_one({"_id":ObjectId(id)}, {'$set': updated})
-    found= await db["tank"].find_one({"_id": ObjectId(id)})
-
-    if (found) is None:
-        raise HTTPException(status_code=404, detail="Item not found")
-
-    if result.modified_count == 1:
-        if found is not None:
-            return found
-    
+  find = await db["data"].find_one({"poke": "mon"})
+  
+  if find:
+    await db["data"].update_one(({"poke": "mon"}), {"$set": update})
+    find = await db["data"].find_one({"poke": "mon"})
+    return find,204
+  else:
+    await db["data"].insert_one({**update, "poke": "mon"})
+    find = await db["data"].find_one({"poke": "mon"})
+    return find,204
