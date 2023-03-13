@@ -11,7 +11,6 @@ import requests
 app = FastAPI()
 
 origins = [
-    https://ireallyhatethislabphillip.onrender.com
 ]
 app.add_middleware(
     CORSMiddleware,

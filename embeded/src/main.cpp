@@ -35,6 +35,8 @@ void loop() {
 
     HTTPClient http;
   
+
+  float temp = random(21.0,33.0);
     // Establish a connection to the server
     http.begin(endpoint);
     
@@ -42,17 +44,17 @@ void loop() {
    
 
       http.addHeader("Content-Type", "application/json");
-      
+      http.addHeader("Content-length", "23");
       
 
       // Serialise JSON object into a string to be sent to the API
       StaticJsonDocument<1024> doc;
       String httpRequestData;
 
-      float temp = random(21.0,33.0);
+      
 
 
-      doc["temperature"] = temp;
+      doc["temperature"] =temp;
 
       serializeJson(doc, httpRequestData);
 
@@ -78,14 +80,14 @@ void loop() {
 
 
 
-    http.begin(endpoint2);
+    http.begin(endpoint);
     
 
-    int httpResponseCode = http.GET();
+    int httpResponseCode2 = http.GET();
 
-    if(httpResponseCode>0){
+    if(httpResponseCode2>0){
       Serial.print("HTTP Response code: ");
-      Serial.println(httpResponseCode);
+      Serial.println(httpResponseCode2);
 
       Serial.print("Response from server: ");
       http_response = http.getString();
@@ -94,59 +96,48 @@ void loop() {
     }
     else {
       Serial.print("Error Code: ");
-      Serial.println(httpResponseCode);
+      Serial.println(httpResponseCode2);
     }
 
-    http.end();
+    
 
     // Stream& input;
 
-    StaticJsonDocument<192> doc;
+   
 
-    DeserializationError error = deserializeJson(doc, http_response);
+    StaticJsonDocument<192> doc2;
+
+    DeserializationError error = deserializeJson(doc2, http_response);
 
     if (error) {
-    Serial.print("deserializeJson() failed: ");
-    Serial.println(error.c_str());
-    return;
+      Serial.print("deserializeJson() failed: ");
+      Serial.println(error.c_str());
+      return;
     }
 
-    const char* id = doc["_id"]; // "63fa370b77ef4b58d465b0bd"
-    const char* user = doc["user"]; // "Kingsley#9729"
-    bool light_switch_1 = doc["light_switch_1"]; // false
-    bool light_switch_2 = doc["light_switch_2"]; // true
-    bool light_switch_3 = doc["light_switch_3"]; // true
+    const char* id = doc["_id"]; // "640e3d68bf11b4131596c840"
+    float temperature = doc["temperature"]; // 3.2
+    bool light = doc["light"]; // true
+    bool fan = doc["fan"]; // false
+    const char* poke = doc["poke"]; // "mon"
 
     Serial.println("");
 
-    Serial.print("light_switch_1: ");
-    Serial.println(light_switch_1);
+    Serial.print("Fan: ");
+    Serial.println(fan);
 
-    Serial.print("light_switch_2: ");
-    Serial.println(light_switch_2);
-
-    Serial.print("light_switch_3: ");
-    Serial.println(light_switch_3);
+    Serial.print("Light: ");
+    Serial.println(light);
 
     Serial.println("");
 
     //switch 1
-    if (Light==0)
-    {
-      digitalWrite(Light,LOW);
-    }
-    else{
-      digitalWrite(Light,HIGH);
-    }
+      digitalWrite(Light,light);
 
-    //switch 2
-    if (Fan==0)
-    {
-      digitalWrite(Fan,LOW);
-    }
-    else{
-      digitalWrite(Fan,HIGH);
-    }
+      digitalWrite(Fan,fan);
+
+    http.end();
+    
   }
   else {
     Serial.println("WiFi Disconnected");
